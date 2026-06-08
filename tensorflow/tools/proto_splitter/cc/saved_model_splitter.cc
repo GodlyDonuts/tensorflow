@@ -14,9 +14,11 @@ limitations under the License.
 ==============================================================================*/
 #include "tensorflow/tools/proto_splitter/cc/saved_model_splitter.h"
 
+#include <string>
 #include <vector>
 
 #include "absl/status/status.h"
+#include "xla/tsl/platform/errors.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/protobuf/meta_graph.pb.h"
 #include "tensorflow/core/protobuf/saved_model.pb.h"
@@ -24,8 +26,6 @@ limitations under the License.
 #include "tensorflow/tools/proto_splitter/cc/large_node_splitter.h"
 #include "tensorflow/tools/proto_splitter/cc/max_size.h"
 #include "tensorflow/tools/proto_splitter/cc/util.h"
-#include "tsl/platform/errors.h"
-#include "tsl/platform/protobuf.h"
 
 namespace tensorflow {
 namespace tools::proto_splitter {
@@ -38,6 +38,14 @@ absl::Status SavedModelSplitter::BuildChunks() {
   SavedModel* sm = google::protobuf::DynamicCastMessage<SavedModel>(message());
   int max_size = GetMaxSize();
   if (GetInitialSize() < max_size) return absl::OkStatus();
+
+  if (sm == nullptr) {
+    return absl::InvalidArgumentError("Message is not a SavedModel.");
+  }
+
+  if (sm->meta_graphs_size() == 0) {
+    return absl::FailedPreconditionError("SavedModel has no meta graphs.");
+  }
 
   std::vector<FieldType> fields_to_graph_def = {"meta_graphs"s, 0,
                                                 "graph_def"s};

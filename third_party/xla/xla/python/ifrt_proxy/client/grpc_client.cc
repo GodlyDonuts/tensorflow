@@ -14,13 +14,18 @@
 
 #include <functional>
 #include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/log/log_entry.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
@@ -41,7 +46,6 @@
 #include "xla/python/ifrt_proxy/common/versions.h"
 #include "xla/tsl/concurrency/future.h"
 #include "xla/tsl/platform/errors.h"
-#include "xla/tsl/platform/statusor.h"
 #include "tsl/platform/stacktrace.h"
 
 namespace xla {
@@ -57,6 +61,16 @@ namespace proxy {
   } while (false)
 
 namespace {
+
+std::string CleanStackTrace(absl::string_view stack_trace) {
+  std::vector<absl::string_view> lines;
+  for (absl::string_view line : absl::StrSplit(stack_trace, '\n')) {
+    if (!absl::StripAsciiWhitespace(line).empty()) {
+      lines.push_back(line);
+    }
+  }
+  return absl::StrJoin(lines, "\n");
+}
 
 // Attempts to establish a session to the proxy-server and returns a `Client`
 // based on the session if successful. `on_disconnect` will be invoked exactly
@@ -88,8 +102,9 @@ absl::StatusOr<std::unique_ptr<Client>> AttemptConnection(
     if (init_response.IsReady() && init_response.Await().ok()) {
       // If the init RPC has already completed successfully, we have
       // already or will be returning OK from the `AttemptConnection` call.
-      LOG(WARNING) << "IFRT proxy server disconnected: " << s
-                   << "; Stack trace: " << tsl::CurrentStackTrace();
+      LOG(INFO) << "IFRT proxy server disconnected successfully with status: `"
+                << s << "`; Stack trace: "
+                << CleanStackTrace(tsl::CurrentStackTrace());
       if (on_disconnect != nullptr) {
         on_disconnect(s);
       }

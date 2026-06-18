@@ -1946,11 +1946,8 @@ Queue<TaskType>::PeekBatchPriorityImpl() const {
         tasks_priority_queue_.HighestCriticality();
     // Priority is 4 - criticality, so CRITICAL_PLUS (3) -> 1, CRITICAL (2) ->
     // 2, etc.
-
-    const int max_priority =
-        static_cast<int>(tsl::criticality::Criticality::kCriticalPlus);
     return std::make_pair(
-        max_priority - static_cast<int>(highest_criticality.value()),
+        4 - static_cast<int>(highest_criticality.value()),
         tasks_priority_queue_.EarliestHighPriorityTaskStartTime().value());
   }
 

@@ -201,9 +201,10 @@ absl::StatusOr<TensorValue> EmitConcatenate(
   ASSIGN_OR_RETURN(TileInfo tile_info,
                    TileInfo::Construct(emitter_ctx, tiled_concat));
   RETURN_IF_ERROR(CheckConcatenateOperands(*hlo_concat, concat_dim_tile_size));
-  Type result_type =
-      mlir::RankedTensorType::get(tile_sizes, tile_info.storage_type());
-
+  ASSIGN_OR_RETURN(
+      auto element_type,
+      xtile::PrimitiveTypeToMlirType(b, hlo_concat->shape().element_type()));
+  Type result_type = mlir::RankedTensorType::get(tile_sizes, element_type);
   // We will load and compute from a single operand, so we need to figure out
   // which one by looking at the offset within the concatenation dimension.
   Value concatenate_dimension_offset =
@@ -242,8 +243,13 @@ absl::StatusOr<TensorValue> EmitConcatenate(
     }
     const auto& region = tiled_concat.hlo_regions()[i];
     const ge::TiledHloInstruction* const region_root = region.back().get();
-    ASSIGN_OR_RETURN(auto results,
+    ASSIGN_OR_RETURN(std::vector<TensorValue> results,
                      EmitTiledComputation(emitter_ctx, region, {region_root}));
+    CHECK_EQ(results.size(), 1)
+        << "Concatenation region must have exactly one result"
+        << results.size();
+    CHECK_EQ(results[0].getType(), result_type)
+        << "Region result type must match the concatenate result type";
     mlir::scf::YieldOp::create(b, results.back());
   }
   b.setInsertionPointAfter(if_ops.front());
@@ -585,9 +591,10 @@ absl::StatusOr<TensorValue> EmitIota(
   // Then, add the base offset to the iota components.
   range = arith::AddIOp::create(
       b, range, xtile::Splat(b, iota_dim_offset, padded_tile_sizes[iota_dim]));
-
-  // Cast the result to the targeted type.
-  range = Cast(b, range, tile_info.storage_type());
+  ASSIGN_OR_RETURN(
+      Type iota_element_type,
+      PrimitiveTypeToMlirType(b, hlo_iota->shape().element_type()));
+  range = Cast(b, range, iota_element_type);
 
   // And finally, produce a broadcast along the non-iota dimensions in order to
   // produce the whole iota tile.

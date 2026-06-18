@@ -299,6 +299,8 @@ register_toolchains("@rules_ml_toolchain//cc:linux_aarch64_linux_aarch64")
 
 register_toolchains("@rules_ml_toolchain//cc:linux_aarch64_linux_aarch64_cuda")
 
+register_toolchains("@rules_ml_toolchain//cc:linux_x86_64_darwin_aarch64")
+
 ### Other local config repos
 rocm_configure = use_extension("@xla//third_party/extensions:rocm_configure.bzl", "rocm_configure_ext")
 use_repo(rocm_configure, "local_config_rocm")
